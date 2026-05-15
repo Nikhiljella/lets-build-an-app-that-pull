@@ -4,6 +4,7 @@ import {
   BarChart3,
   CheckCircle2,
   Filter,
+  Newspaper,
   RefreshCcw,
   Search,
   ShieldCheck,
@@ -13,6 +14,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import {
   fetchIndianDiscountStocks,
+  fetchStockNews,
   getDiscountPercent,
   getFallbackDiscountStocks,
   indianStockUniverse,
@@ -31,6 +33,15 @@ const volume = new Intl.NumberFormat("en-IN", {
 });
 
 const sectors = ["All", ...Array.from(new Set(indianStockUniverse.map((stock) => stock.sector)))];
+
+function formatMove(stock) {
+  if (!Number.isFinite(stock.change) || !Number.isFinite(stock.changePercent)) {
+    return "Move unavailable";
+  }
+
+  const sign = stock.change > 0 ? "+" : "";
+  return `${sign}${stock.change.toFixed(2)} (${sign}${stock.changePercent.toFixed(2)}%)`;
+}
 
 function Sparkline({ points }) {
   const min = Math.min(...points);
@@ -79,6 +90,9 @@ export function StocksAtDiscountFeature() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [lastUpdated, setLastUpdated] = useState("");
+  const [stockNews, setStockNews] = useState([]);
+  const [newsLoading, setNewsLoading] = useState(false);
+  const [newsError, setNewsError] = useState("");
 
   async function loadStocks() {
     setLoading(true);
@@ -149,6 +163,40 @@ export function StocksAtDiscountFeature() {
   const averageDiscount = Math.round(
     visibleStocks.reduce((sum, stock) => sum + getDiscountPercent(stock), 0) / (visibleStocks.length || 1)
   );
+
+  useEffect(() => {
+    if (!selectedStock?.ticker) return;
+
+    let isCurrent = true;
+
+    async function loadStockNews() {
+      setNewsLoading(true);
+      setNewsError("");
+
+      try {
+        const news = await fetchStockNews(selectedStock.symbol ?? selectedStock.ticker);
+
+        if (isCurrent) {
+          setStockNews(news.slice(0, 3));
+        }
+      } catch (loadError) {
+        if (isCurrent) {
+          setStockNews([]);
+          setNewsError(loadError.message);
+        }
+      } finally {
+        if (isCurrent) {
+          setNewsLoading(false);
+        }
+      }
+    }
+
+    loadStockNews();
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [selectedStock?.ticker, selectedStock?.symbol]);
 
   return (
     <main className="app-shell">
@@ -330,6 +378,12 @@ export function StocksAtDiscountFeature() {
                 Volume <strong>{selectedStock.volume ? volume.format(selectedStock.volume) : "N/A"}</strong>
               </span>
               <span>
+                Move <strong className={selectedStock.change < 0 ? "negative" : "positive"}>{formatMove(selectedStock)}</strong>
+              </span>
+              <span>
+                P/E <strong>{Number.isFinite(selectedStock.pe) ? selectedStock.pe.toFixed(2) : "N/A"}</strong>
+              </span>
+              <span>
                 Source <strong>{selectedStock.source}</strong>
               </span>
             </div>
@@ -341,6 +395,42 @@ export function StocksAtDiscountFeature() {
                 trading well below recent highs, then confirm valuation with fundamentals before buying.
               </p>
             </div>
+
+            <section className="news-panel" aria-label="Top stock news">
+              <div className="news-heading">
+                <div>
+                  <span>Top 3</span>
+                  <h3>Why it may be down</h3>
+                </div>
+                <Newspaper size={20} />
+              </div>
+
+              {newsLoading && <p className="news-state">Loading NSE announcements...</p>}
+              {newsError && !newsLoading && (
+                <p className="news-state">News unavailable: {newsError}</p>
+              )}
+              {!newsLoading && !newsError && stockNews.length === 0 && (
+                <p className="news-state">No recent NSE announcements found.</p>
+              )}
+
+              {!newsLoading && !newsError && stockNews.length > 0 && (
+                <ol className="news-list">
+                  {stockNews.map((item, index) => (
+                    <li key={`${item.date}-${index}`}>
+                      <span>{item.category}</span>
+                      {item.url ? (
+                        <a href={item.url} target="_blank" rel="noreferrer">
+                          {item.headline}
+                        </a>
+                      ) : (
+                        <p>{item.headline}</p>
+                      )}
+                      <small>{item.date}</small>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </section>
           </aside>
         </section>
       </section>

@@ -391,6 +391,14 @@ h1 {
   color: #17201b;
 }
 
+.metrics-grid strong.negative {
+  color: #b42318;
+}
+
+.metrics-grid strong.positive {
+  color: #1e7659;
+}
+
 .watch-note {
   margin-top: 16px;
   padding: 16px;
@@ -408,6 +416,68 @@ h1 {
 .watch-note p {
   color: #3d463f;
   line-height: 1.5;
+}
+
+.news-panel {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e3e7e3;
+}
+
+.news-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.news-heading span {
+  color: #647067;
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.news-heading h3 {
+  font-size: 20px;
+  margin: 3px 0 0;
+}
+
+.news-state {
+  color: #647067;
+  line-height: 1.5;
+}
+
+.news-list {
+  display: grid;
+  gap: 12px;
+  list-style-position: inside;
+  margin: 0;
+  padding: 0;
+}
+
+.news-list li {
+  background: #f6f7f5;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.news-list span,
+.news-list small {
+  display: block;
+  color: #647067;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.news-list a,
+.news-list p {
+  color: #17201b;
+  display: block;
+  line-height: 1.4;
+  margin: 6px 0;
+  text-decoration-color: #9fb3a5;
 }
 
 .empty-state {

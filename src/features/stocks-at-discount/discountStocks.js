@@ -102,6 +102,18 @@ export async function fetchIndianDiscountStocks() {
   return data.stocks;
 }
 
+export async function fetchStockNews(symbol) {
+  const cleanSymbol = symbol.replace(".NS", "");
+  const response = await fetch(`/api/stock-news/${encodeURIComponent(cleanSymbol)}`);
+
+  if (!response.ok) {
+    throw new Error(`news API returned ${response.status}`);
+  }
+
+  const data = await response.json();
+  return data.news ?? [];
+}
+
 export function getFallbackDiscountStocks() {
   return fallbackStocks;
 }

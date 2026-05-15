@@ -2,7 +2,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 import dalal
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 
@@ -89,6 +89,8 @@ def _normalize_quote(profile: dict[str, Any]) -> dict[str, Any]:
         "company": info.get("companyName") or profile["company"],
         "sector": industry_info.get("macro") or profile["sector"],
         "price": price,
+        "change": _num(price_info.get("change")),
+        "changePercent": _num(price_info.get("pChange")),
         "fairValue": fair_value,
         "fairValueLabel": "52W high",
         "dayLow": _num(day_range.get("min")),
@@ -102,6 +104,16 @@ def _normalize_quote(profile: dict[str, Any]) -> dict[str, Any]:
         "updatedAt": metadata.get("lastUpdateTime"),
         "popularity": profile["popularity"],
         "spark": spark or [price],
+    }
+
+
+def _normalize_announcement(item: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "category": item.get("desc") or "Announcement",
+        "headline": item.get("attchmntText") or item.get("desc") or "NSE announcement",
+        "date": item.get("an_dt") or item.get("sort_date"),
+        "source": "NSE corporate announcement",
+        "url": item.get("attchmntFile"),
     }
 
 
@@ -134,4 +146,27 @@ def stocks_at_discount() -> dict[str, Any]:
         "count": len(stocks),
         "errors": errors,
         "stocks": stocks,
+    }
+
+
+@app.get("/api/stock-news/{symbol}")
+def stock_news(symbol: str) -> dict[str, Any]:
+    clean_symbol = symbol.upper().replace(".NS", "")
+    known_symbols = {profile["symbol"] for profile in POPULAR_INDIAN_STOCKS}
+
+    if clean_symbol not in known_symbols:
+        raise HTTPException(status_code=404, detail=f"Unknown stock symbol: {symbol}")
+
+    try:
+        announcements = dalal.announcements(clean_symbol)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    news = [_normalize_announcement(item) for item in announcements[:3]]
+
+    return {
+        "symbol": clean_symbol,
+        "source": "dalal / NSE announcements",
+        "count": len(news),
+        "news": news,
     }
