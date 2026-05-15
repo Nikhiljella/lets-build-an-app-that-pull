@@ -1,0 +1,21 @@
+{
+  "name": "investment-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "api": ".venv/bin/uvicorn backend.app:app --host 127.0.0.1 --port 8000",
+    "build": "vite build",
+    "dev": "vite --host 127.0.0.1",
+    "start": "vite --host 127.0.0.1"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "latest",
+    "vite": "latest",
+    "typescript": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "lucide-react": "latest"
+  },
+  "devDependencies": {}
+}
