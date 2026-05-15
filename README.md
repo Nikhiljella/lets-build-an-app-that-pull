@@ -20,6 +20,8 @@ The app uses:
 - Shows the top 3 Google News results for the selected stock
 - Falls back to sample data if the live data source is unavailable
 
+Feature docs live in [docs/features.md](docs/features.md). Every new feature should include a `FEATURE.md` file in its feature folder.
+
 ## Data Source
 
 Live data is pulled with [`dalal`](https://pypi.org/project/dalal/), a Python package for Indian stock market data.
