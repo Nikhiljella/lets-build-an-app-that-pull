@@ -449,6 +449,63 @@ h1 {
   line-height: 1.5;
 }
 
+.reason-card {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.reason-summary {
+  background: #eef5f0;
+  border: 1px solid #cfe0d4;
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.reason-summary span {
+  display: inline-flex;
+  color: #1e7659;
+  font-size: 12px;
+  font-weight: 800;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.reason-summary p {
+  color: #17201b;
+  line-height: 1.45;
+}
+
+.reason-list {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.reason-list li {
+  border-left: 3px solid #e4b55d;
+  background: #fbfcfa;
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+.reason-list strong,
+.reason-list span {
+  display: block;
+}
+
+.reason-list strong {
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.reason-list span {
+  color: #647067;
+  line-height: 1.4;
+}
+
 .news-list {
   display: grid;
   gap: 12px;

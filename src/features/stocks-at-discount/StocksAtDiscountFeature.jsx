@@ -14,7 +14,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import {
   fetchIndianDiscountStocks,
-  fetchStockNews,
+  fetchStockReason,
   getDiscountPercent,
   getFallbackDiscountStocks,
   indianStockUniverse,
@@ -90,9 +90,9 @@ export function StocksAtDiscountFeature() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [lastUpdated, setLastUpdated] = useState("");
-  const [stockNews, setStockNews] = useState([]);
-  const [newsLoading, setNewsLoading] = useState(false);
-  const [newsError, setNewsError] = useState("");
+  const [stockReason, setStockReason] = useState(null);
+  const [reasonLoading, setReasonLoading] = useState(false);
+  const [reasonError, setReasonError] = useState("");
 
   async function loadStocks() {
     setLoading(true);
@@ -169,29 +169,29 @@ export function StocksAtDiscountFeature() {
 
     let isCurrent = true;
 
-    async function loadStockNews() {
-      setNewsLoading(true);
-      setNewsError("");
+    async function loadStockReason() {
+      setReasonLoading(true);
+      setReasonError("");
 
       try {
-        const news = await fetchStockNews(selectedStock.symbol ?? selectedStock.ticker);
+        const reason = await fetchStockReason(selectedStock.symbol ?? selectedStock.ticker);
 
         if (isCurrent) {
-          setStockNews(news.slice(0, 3));
+          setStockReason(reason);
         }
       } catch (loadError) {
         if (isCurrent) {
-          setStockNews([]);
-          setNewsError(loadError.message);
+          setStockReason(null);
+          setReasonError(loadError.message);
         }
       } finally {
         if (isCurrent) {
-          setNewsLoading(false);
+          setReasonLoading(false);
         }
       }
     }
 
-    loadStockNews();
+    loadStockReason();
 
     return () => {
       isCurrent = false;
@@ -396,26 +396,44 @@ export function StocksAtDiscountFeature() {
               </p>
             </div>
 
-            <section className="news-panel" aria-label="Top stock news">
+            <section className="news-panel" aria-label="Stock downside reason">
               <div className="news-heading">
                 <div>
-                  <span>Top 3</span>
+                  <span>Reason Engine</span>
                   <h3>Why it may be down</h3>
                 </div>
                 <Newspaper size={20} />
               </div>
 
-              {newsLoading && <p className="news-state">Loading Google News...</p>}
-              {newsError && !newsLoading && (
-                <p className="news-state">News unavailable: {newsError}</p>
+              {reasonLoading && <p className="news-state">Building downside summary...</p>}
+              {reasonError && !reasonLoading && (
+                <p className="news-state">Reason unavailable: {reasonError}</p>
               )}
-              {!newsLoading && !newsError && stockNews.length === 0 && (
-                <p className="news-state">No recent Google News items found.</p>
+              {!reasonLoading && !reasonError && !stockReason && (
+                <p className="news-state">No downside summary available.</p>
               )}
 
-              {!newsLoading && !newsError && stockNews.length > 0 && (
+              {!reasonLoading && !reasonError && stockReason && (
+                <div className="reason-card">
+                  <div className="reason-summary">
+                    <span>{stockReason.confidence} confidence</span>
+                    <p>{stockReason.summary}</p>
+                  </div>
+
+                  <ul className="reason-list">
+                    {stockReason.reasons.map((reason) => (
+                      <li key={`${reason.label}-${reason.detail}`}>
+                        <strong>{reason.label}</strong>
+                        <span>{reason.detail}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {!reasonLoading && !reasonError && stockReason?.news?.length > 0 && (
                 <ol className="news-list">
-                  {stockNews.map((item, index) => (
+                  {stockReason.news.map((item, index) => (
                     <li key={`${item.date}-${index}`}>
                       <span>{item.category}</span>
                       {item.url ? (

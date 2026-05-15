@@ -24,3 +24,4 @@ The feature doc should cover:
 ## Current Features
 
 - [Stocks at Discount](../src/features/stocks-at-discount/FEATURE.md)
+- [Stock Down Reason](../src/features/stock-down-reason/FEATURE.md)

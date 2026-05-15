@@ -13,7 +13,7 @@ This feature is a screening tool, not a buy/sell recommendation.
 3. Results are grouped by sector.
 4. The user chooses how many stocks to show per sector.
 5. Selecting a stock opens its detail panel.
-6. The detail panel shows price metrics, move, PE, discount from 52-week high, and top 3 related Google News items.
+6. The detail panel shows price metrics, move, PE, discount from 52-week high, and a downside reason summary.
 
 ## Data Sources
 
@@ -41,17 +41,17 @@ Returned stock rows include:
 - PE and sector PE
 - sparkline points
 
-### Stock News
+### Stock Down Reason
 
 Source: Google News RSS.
 
 Backend route:
 
 ```text
-GET /api/stock-news/{symbol}
+GET /api/stock-reason/{symbol}
 ```
 
-The backend searches Google News using the company name, symbol, stock/share terms, NSE, and India. It returns the first three RSS items.
+The backend combines live quote signals with Google News RSS results to produce a short explanation, confidence level, evidence bullets, and linked headlines.
 
 Returned news rows include:
 

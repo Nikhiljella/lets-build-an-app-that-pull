@@ -136,6 +136,144 @@ def _normalize_google_item(item: ElementTree.Element) -> dict[str, Any]:
     }
 
 
+def _fetch_google_news(profile: dict[str, Any]) -> list[dict[str, Any]]:
+    response = requests.get(
+        _google_news_url(profile),
+        headers={
+            "User-Agent": "Mozilla/5.0",
+            "Accept": "application/rss+xml,application/xml,text/xml",
+        },
+        timeout=8,
+    )
+    response.raise_for_status()
+    root = ElementTree.fromstring(response.content)
+    items = root.findall("./channel/item")
+    return [_normalize_google_item(item) for item in items[:3]]
+
+
+def _headline_tags(news: list[dict[str, Any]]) -> list[str]:
+    tags: list[str] = []
+    tag_terms = {
+        "price weakness": ["slump", "fall", "falls", "down", "decline", "drops", "weak", "selloff"],
+        "earnings pressure": ["profit", "earnings", "results", "margin", "revenue", "quarter"],
+        "valuation concern": ["valuation", "expensive", "p/e", "premium"],
+        "analyst concern": ["downgrade", "target", "brokerage", "rating", "analyst"],
+        "regulatory pressure": ["regulator", "sebi", "rbi", "probe", "penalty", "tax"],
+        "sector pressure": ["sector", "market", "nifty", "sensex", "rupee", "crude", "rates"],
+    }
+
+    headlines = " ".join(item["headline"].lower() for item in news)
+
+    for tag, terms in tag_terms.items():
+        if any(term in headlines for term in terms):
+            tags.append(tag)
+
+    return tags
+
+
+def _stock_reason(profile: dict[str, Any]) -> dict[str, Any]:
+    quote = _normalize_quote(profile)
+    news = _fetch_google_news(profile)
+    discount = round(((quote["fairValue"] - quote["price"]) / quote["fairValue"]) * 100)
+    change_percent = quote.get("changePercent")
+    tags = _headline_tags(news)
+    reasons: list[dict[str, str]] = []
+
+    if isinstance(change_percent, float) and change_percent < 0:
+        reasons.append(
+            {
+                "label": "Negative daily move",
+                "detail": f"The stock is down {abs(change_percent):.2f}% in the latest NSE quote.",
+                "tone": "negative",
+            }
+        )
+    elif isinstance(change_percent, float):
+        reasons.append(
+            {
+                "label": "Not down today",
+                "detail": f"The stock is up {change_percent:.2f}% in the latest NSE quote, so weakness may be broader-period rather than intraday.",
+                "tone": "neutral",
+            }
+        )
+
+    if discount >= 30:
+        reasons.append(
+            {
+                "label": "Deep 52-week discount",
+                "detail": f"It trades {discount}% below its 52-week high, which points to sustained price pressure.",
+                "tone": "negative",
+            }
+        )
+    elif discount >= 15:
+        reasons.append(
+            {
+                "label": "Meaningful 52-week discount",
+                "detail": f"It trades {discount}% below its 52-week high, making it worth checking recent catalysts.",
+                "tone": "caution",
+            }
+        )
+
+    if quote.get("dayLow") and quote.get("dayHigh") and quote["dayHigh"] > quote["dayLow"]:
+        day_position = (quote["price"] - quote["dayLow"]) / (quote["dayHigh"] - quote["dayLow"])
+        if day_position < 0.35:
+            reasons.append(
+                {
+                    "label": "Weak intraday position",
+                    "detail": "The latest price is trading near the day's low, suggesting active selling pressure.",
+                    "tone": "negative",
+                }
+            )
+
+    if quote.get("pe") and quote.get("sectorPe") and quote["sectorPe"] > 0:
+        pe_gap = ((quote["pe"] - quote["sectorPe"]) / quote["sectorPe"]) * 100
+        if pe_gap > 15:
+            reasons.append(
+                {
+                    "label": "Valuation is less forgiving",
+                    "detail": f"P/E is about {pe_gap:.0f}% above sector P/E, so negative news may hit harder.",
+                    "tone": "caution",
+                }
+            )
+
+    for tag in tags[:3]:
+        reasons.append(
+            {
+                "label": tag.title(),
+                "detail": f"Recent Google News headlines include {tag} signals.",
+                "tone": "caution",
+            }
+        )
+
+    if not reasons:
+        reasons.append(
+            {
+                "label": "No strong downside signal found",
+                "detail": "The latest quote and Google News headlines do not point to one obvious reason.",
+                "tone": "neutral",
+            }
+        )
+
+    negative_count = sum(1 for reason in reasons if reason["tone"] == "negative")
+    confidence = "high" if negative_count >= 2 and tags else "medium" if negative_count or tags else "low"
+    reason_labels = ", ".join(reason["label"].lower() for reason in reasons[:3])
+
+    summary = (
+        f"{quote['company']} is {discount}% below its 52-week high. "
+        f"The likely pressure points are {reason_labels}. "
+        "Treat this as a signal summary, not a confirmed cause."
+    )
+
+    return {
+        "symbol": profile["symbol"],
+        "company": quote["company"],
+        "source": "dalal / NSE + Google News RSS",
+        "confidence": confidence,
+        "summary": summary,
+        "reasons": reasons[:5],
+        "news": news,
+    }
+
+
 @app.get("/api/health")
 def health() -> dict[str, str]:
     return {"status": "ok", "source": "dalal"}
@@ -177,21 +315,9 @@ def stock_news(symbol: str) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail=f"Unknown stock symbol: {symbol}")
 
     try:
-        response = requests.get(
-            _google_news_url(profile),
-            headers={
-                "User-Agent": "Mozilla/5.0",
-                "Accept": "application/rss+xml,application/xml,text/xml",
-            },
-            timeout=8,
-        )
-        response.raise_for_status()
-        root = ElementTree.fromstring(response.content)
+        news = _fetch_google_news(profile)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Google News fetch failed: {exc}") from exc
-
-    items = root.findall("./channel/item")
-    news = [_normalize_google_item(item) for item in items[:3]]
 
     return {
         "symbol": clean_symbol,
@@ -199,3 +325,17 @@ def stock_news(symbol: str) -> dict[str, Any]:
         "count": len(news),
         "news": news,
     }
+
+
+@app.get("/api/stock-reason/{symbol}")
+def stock_reason(symbol: str) -> dict[str, Any]:
+    clean_symbol = symbol.upper().replace(".NS", "")
+    profile = _profile_for_symbol(clean_symbol)
+
+    if not profile:
+        raise HTTPException(status_code=404, detail=f"Unknown stock symbol: {symbol}")
+
+    try:
+        return _stock_reason(profile)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Reason engine failed: {exc}") from exc
