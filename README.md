@@ -17,6 +17,7 @@ The app uses:
 - Filters by sector, search text, and minimum discount
 - Sorts by discount, score, or price
 - Shows price, 52-week high gap, day range, volume, PE, sector PE, and source
+- Shows the top 3 Google News results for the selected stock
 - Falls back to sample data if the live data source is unavailable
 
 ## Data Source
@@ -78,6 +79,12 @@ Discount stock feed:
 
 ```text
 GET /api/stocks-at-discount
+```
+
+Selected-stock news:
+
+```text
+GET /api/stock-news/{symbol}
 ```
 
 The Vite dev server proxies `/api` requests to the FastAPI backend on port `8000`.

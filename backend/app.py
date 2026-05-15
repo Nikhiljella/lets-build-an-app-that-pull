@@ -1,7 +1,11 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from html import unescape
 from typing import Any
+from urllib.parse import quote_plus
+from xml.etree import ElementTree
 
 import dalal
+import requests
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -107,13 +111,28 @@ def _normalize_quote(profile: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _normalize_announcement(item: dict[str, Any]) -> dict[str, Any]:
+def _profile_for_symbol(symbol: str) -> dict[str, Any] | None:
+    return next((profile for profile in POPULAR_INDIAN_STOCKS if profile["symbol"] == symbol), None)
+
+
+def _google_news_url(profile: dict[str, Any]) -> str:
+    query = f'"{profile["company"]}" OR {profile["symbol"]} stock shares NSE India'
+    return (
+        "https://news.google.com/rss/search?"
+        f"q={quote_plus(query)}&hl=en-IN&gl=IN&ceid=IN:en"
+    )
+
+
+def _normalize_google_item(item: ElementTree.Element) -> dict[str, Any]:
+    title = unescape(item.findtext("title") or "Google News item")
+    source = item.findtext("source") or "Google News"
+
     return {
-        "category": item.get("desc") or "Announcement",
-        "headline": item.get("attchmntText") or item.get("desc") or "NSE announcement",
-        "date": item.get("an_dt") or item.get("sort_date"),
-        "source": "NSE corporate announcement",
-        "url": item.get("attchmntFile"),
+        "category": unescape(source),
+        "headline": title,
+        "date": item.findtext("pubDate"),
+        "source": "Google News",
+        "url": item.findtext("link"),
     }
 
 
@@ -152,21 +171,31 @@ def stocks_at_discount() -> dict[str, Any]:
 @app.get("/api/stock-news/{symbol}")
 def stock_news(symbol: str) -> dict[str, Any]:
     clean_symbol = symbol.upper().replace(".NS", "")
-    known_symbols = {profile["symbol"] for profile in POPULAR_INDIAN_STOCKS}
+    profile = _profile_for_symbol(clean_symbol)
 
-    if clean_symbol not in known_symbols:
+    if not profile:
         raise HTTPException(status_code=404, detail=f"Unknown stock symbol: {symbol}")
 
     try:
-        announcements = dalal.announcements(clean_symbol)
+        response = requests.get(
+            _google_news_url(profile),
+            headers={
+                "User-Agent": "Mozilla/5.0",
+                "Accept": "application/rss+xml,application/xml,text/xml",
+            },
+            timeout=8,
+        )
+        response.raise_for_status()
+        root = ElementTree.fromstring(response.content)
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        raise HTTPException(status_code=502, detail=f"Google News fetch failed: {exc}") from exc
 
-    news = [_normalize_announcement(item) for item in announcements[:3]]
+    items = root.findall("./channel/item")
+    news = [_normalize_google_item(item) for item in items[:3]]
 
     return {
         "symbol": clean_symbol,
-        "source": "dalal / NSE announcements",
+        "source": "Google News RSS",
         "count": len(news),
         "news": news,
     }

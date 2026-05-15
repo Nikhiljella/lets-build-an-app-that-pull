@@ -405,12 +405,12 @@ export function StocksAtDiscountFeature() {
                 <Newspaper size={20} />
               </div>
 
-              {newsLoading && <p className="news-state">Loading NSE announcements...</p>}
+              {newsLoading && <p className="news-state">Loading Google News...</p>}
               {newsError && !newsLoading && (
                 <p className="news-state">News unavailable: {newsError}</p>
               )}
               {!newsLoading && !newsError && stockNews.length === 0 && (
-                <p className="news-state">No recent NSE announcements found.</p>
+                <p className="news-state">No recent Google News items found.</p>
               )}
 
               {!newsLoading && !newsError && stockNews.length > 0 && (
